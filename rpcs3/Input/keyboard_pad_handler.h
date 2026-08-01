@@ -8,7 +8,6 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include <atomic>
 
 enum mouse : u32
 {
@@ -100,12 +99,6 @@ public:
 
 	static int native_scan_code_from_string(const std::string& key);
 	static std::string native_scan_code_to_string(int native_scan_code);
-
-	// Timestamp (steady_clock, microseconds since epoch) of the most recent physical
-	// key-down event (auto-repeat excluded). Used for input latency diagnostics, e.g.
-	// measuring how long it takes for a physical key press to be reflected as a hit
-	// in usio.cpp. Only meaningful when testing one key at a time.
-	static std::atomic<u64> s_last_key_press_us;
 
 protected:
 	void Key(const u32 code, bool pressed, u16 value = 255);
