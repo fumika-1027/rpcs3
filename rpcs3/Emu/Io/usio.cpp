@@ -3,7 +3,6 @@
 #include "stdafx.h"
 #include "usio.h"
 #include "Input/pad_thread.h"
-#include "Input/keyboard_pad_handler.h"
 #include "Emu/Io/usio_config.h"
 #include "Emu/IdManager.h"
 #include <chrono>
@@ -235,7 +234,7 @@ void usb_device_usio::translate_input_taiko()
 		// Only meaningful when testing one key at a time; returns -1 if no key press was recorded yet.
 		const auto key_to_hit_latency_ms = [&]() -> double
 		{
-			const u64 press_us = keyboard_pad_handler::s_last_key_press_us.load(std::memory_order_relaxed);
+			const u64 press_us = g_last_key_press_us.load(std::memory_order_relaxed);
 			if (press_us == 0)
 				return -1.0;
 
