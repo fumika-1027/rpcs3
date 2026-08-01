@@ -9,6 +9,8 @@
 #include <algorithm>
 #include <QApplication>
 
+std::atomic<u64> keyboard_pad_handler::s_last_key_press_us{0};
+
 bool keyboard_pad_handler::Init()
 {
 	const steady_clock::time_point now = steady_clock::now();
@@ -476,6 +478,12 @@ void keyboard_pad_handler::processKeyEvent(QKeyEvent* event, bool pressed)
 	{
 		event->ignore();
 		return;
+	}
+
+	if (pressed)
+	{
+		// Record the timestamp of this physical, non-auto-repeat key-down event for input latency diagnostics.
+		s_last_key_press_us.store(std::chrono::duration_cast<std::chrono::microseconds>(steady_clock::now().time_since_epoch()).count(), std::memory_order_relaxed);
 	}
 
 	const auto handle_key = [this, pressed, event]()
