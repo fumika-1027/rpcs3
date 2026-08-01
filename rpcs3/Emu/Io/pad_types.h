@@ -5,9 +5,18 @@
 #include "pad_config_types.h"
 #include "ps_move_data.h"
 
+#include <atomic>
 #include <map>
 #include <set>
 #include <vector>
+
+// Timestamp (steady_clock, microseconds since epoch) of the most recent physical,
+// non-auto-repeat keyboard key-down event. Used for input latency diagnostics
+// (e.g. usio.cpp measuring how long a physical key press takes to register as a
+// taiko hit). Lives here (Qt-free header) so it can be shared between
+// keyboard_pad_handler.cpp (which writes it) and non-Qt emulation code such as
+// usio.cpp (which reads it) without pulling a Qt dependency into the latter.
+inline std::atomic<u64> g_last_key_press_us{0};
 
 enum class pad_button : u8
 {
