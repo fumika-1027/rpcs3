@@ -11,7 +11,7 @@
 #include <QApplication>
 
 // Declaration to use the lock-free counter defined in usio.cpp
-extern std::atomic<u32> g_taiko_pending[2][4];
+extern std::atomic<u64> g_taiko_pending[2][4];
 
 bool keyboard_pad_handler::Init()
 {
@@ -1402,7 +1402,8 @@ void keyboard_pad_handler::process()
 					const u32 player_idx = pad->m_player_id;
 					if (player_idx < 2)
 					{
-						g_taiko_pending[player_idx][lane].store(1, std::memory_order_release);
+						const u64 press_us = std::chrono::duration_cast<std::chrono::microseconds>(steady_clock::now().time_since_epoch()).count();
+						g_taiko_pending[player_idx][lane].store(press_us, std::memory_order_release);
 					}
 				}
 			}
