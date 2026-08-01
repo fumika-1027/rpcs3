@@ -7,13 +7,17 @@
 #include "Emu/IdManager.h"
 
 #include <atomic>
+#include <chrono>
 #include <mutex> // still needed for the pre-existing pad::g_pad_mutex lock_guard usage below
 
 // Lock-free per-lane hit flag, set by keyboard_pad_handler::process() at raw input-poll
 // time and consumed by translate_input_taiko() below. Using a flag rather than a counter
 // keeps this a simple single-producer/single-consumer exchange with no mutex needed,
 // matching how each lane can only report one hit-edge per poll anyway.
-std::atomic<u32> g_taiko_pending[2][4]{};
+// A non-zero value is the steady_clock timestamp (microseconds since epoch) at which
+// keyboard_pad_handler::process() noticed the key-down edge, used for key_to_hit latency
+// diagnostics below.
+std::atomic<u64> g_taiko_pending[2][4]{};
 
 LOG_CHANNEL(usio_log, "USIO");
 
@@ -222,6 +226,13 @@ void usb_device_usio::translate_input_taiko()
 	std::lock_guard lock(pad::g_pad_mutex);
 	const auto handler = pad::get_pad_thread();
 
+	// Measures how much time elapsed since the previous time this function ran,
+	// i.e. how long (in ms) it took the game to poll again and register this hit.
+	static std::chrono::steady_clock::time_point last_poll_time = std::chrono::steady_clock::now();
+	const auto now = std::chrono::steady_clock::now();
+	const auto poll_interval_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_poll_time).count();
+	last_poll_time = now;
+
 	std::vector<u8> input_buf(0x60);
 	le_t<u16> digital_input = 0;
 
@@ -318,6 +329,7 @@ void usb_device_usio::translate_input_taiko()
 		if (player < 2)
 		{
 			static constexpr usz byte_offset[4] = {32, 34, 36, 38};
+			static constexpr const char* lane_name[4] = {"Side Left", "Center Left", "Center Right", "Side Right"};
 
 			// Consume at most one hit per lane per call, reporting the most recent press.
 			// No lock needed: single-producer/single-consumer flag per lane.
@@ -325,8 +337,11 @@ void usb_device_usio::translate_input_taiko()
 			{
 				auto& pending = g_taiko_pending[player][lane];
 
-				if (pending.exchange(0, std::memory_order_acq_rel))
+				if (const u64 press_us = pending.exchange(0, std::memory_order_acq_rel))
 				{
+					const u64 now_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+					const double key_to_hit_ms = static_cast<double>(now_us - press_us) / 1000.0;
+					usio_log.notice("Taiko hit: %s (player=%d, poll_interval=%dms, key_to_hit=%.2fms)", lane_name[lane], player, poll_interval_ms, key_to_hit_ms);
 					fire_hit(input_buf.data() + byte_offset[lane] + offset, player, lane);
 				}
 			}
