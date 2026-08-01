@@ -3,6 +3,7 @@
 #include "stdafx.h"
 #include "usio.h"
 #include "Input/pad_thread.h"
+#include "Input/keyboard_pad_handler.h"
 #include "Emu/Io/usio_config.h"
 #include "Emu/IdManager.h"
 #include <chrono>
@@ -230,6 +231,18 @@ void usb_device_usio::translate_input_taiko()
 		const usz offset = player * 8ULL;
 		auto& status = m_io_status[0];
 
+		// Elapsed time (ms) since the last physical, non-auto-repeat keyboard key-down event.
+		// Only meaningful when testing one key at a time; returns -1 if no key press was recorded yet.
+		const auto key_to_hit_latency_ms = [&]() -> double
+		{
+			const u64 press_us = keyboard_pad_handler::s_last_key_press_us.load(std::memory_order_relaxed);
+			if (press_us == 0)
+				return -1.0;
+
+			const u64 now_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+			return static_cast<double>(now_us - press_us) / 1000.0;
+		};
+
 		if (const auto& pad = ::at32(handler->GetPads(), pad_number); pad->is_connected() && !pad->is_copilot() && is_input_allowed())
 		{
 			const auto& cfg = ::at32(g_cfg_usio.players, pad_number);
@@ -268,28 +281,28 @@ void usb_device_usio::translate_input_taiko()
 				case usio_btn::taiko_hit_side_left:
 					if (value.pressed)
 					{
-						usio_log.notice("Taiko hit: Side Left (player=%d, poll_interval=%dms)", player, poll_interval_ms);
+						usio_log.notice("Taiko hit: Side Left (player=%d, poll_interval=%dms, key_to_hit=%.2fms)", player, poll_interval_ms, key_to_hit_latency_ms());
 						std::memcpy(input_buf.data() + 32 + offset, &c_hit, sizeof(u16));
 					}
 					break;
 				case usio_btn::taiko_hit_center_right:
 					if (value.pressed)
 					{
-						usio_log.notice("Taiko hit: Center Right (player=%d, poll_interval=%dms)", player, poll_interval_ms);
+						usio_log.notice("Taiko hit: Center Right (player=%d, poll_interval=%dms, key_to_hit=%.2fms)", player, poll_interval_ms, key_to_hit_latency_ms());
 						std::memcpy(input_buf.data() + 36 + offset, &c_hit, sizeof(u16));
 					}
 					break;
 				case usio_btn::taiko_hit_side_right:
 					if (value.pressed)
 					{
-						usio_log.notice("Taiko hit: Side Right (player=%d, poll_interval=%dms)", player, poll_interval_ms);
+						usio_log.notice("Taiko hit: Side Right (player=%d, poll_interval=%dms, key_to_hit=%.2fms)", player, poll_interval_ms, key_to_hit_latency_ms());
 						std::memcpy(input_buf.data() + 38 + offset, &c_hit, sizeof(u16));
 					}
 					break;
 				case usio_btn::taiko_hit_center_left:
 					if (value.pressed)
 					{
-						usio_log.notice("Taiko hit: Center Left (player=%d, poll_interval=%dms)", player, poll_interval_ms);
+						usio_log.notice("Taiko hit: Center Left (player=%d, poll_interval=%dms, key_to_hit=%.2fms)", player, poll_interval_ms, key_to_hit_latency_ms());
 						std::memcpy(input_buf.data() + 34 + offset, &c_hit, sizeof(u16));
 					}
 					break;
