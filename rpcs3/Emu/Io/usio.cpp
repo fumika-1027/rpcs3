@@ -5,6 +5,7 @@
 #include "Input/pad_thread.h"
 #include "Emu/Io/usio_config.h"
 #include "Emu/IdManager.h"
+#include <chrono>
 
 LOG_CHANNEL(usio_log, "USIO");
 
@@ -213,6 +214,13 @@ void usb_device_usio::translate_input_taiko()
 	std::lock_guard lock(pad::g_pad_mutex);
 	const auto handler = pad::get_pad_thread();
 
+	// Measures how much time elapsed since the previous time this function ran,
+	// i.e. how long (in ms) it took the game to poll again and register this hit.
+	static std::chrono::steady_clock::time_point last_poll_time = std::chrono::steady_clock::now();
+	const auto now = std::chrono::steady_clock::now();
+	const auto poll_interval_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_poll_time).count();
+	last_poll_time = now;
+
 	std::vector<u8> input_buf(0x60);
 	constexpr le_t<u16> c_hit = 0x1800;
 	le_t<u16> digital_input = 0;
@@ -259,19 +267,31 @@ void usb_device_usio::translate_input_taiko()
 					break;
 				case usio_btn::taiko_hit_side_left:
 					if (value.pressed)
+					{
+						usio_log.notice("Taiko hit: Side Left (player=%d, poll_interval=%dms)", player, poll_interval_ms);
 						std::memcpy(input_buf.data() + 32 + offset, &c_hit, sizeof(u16));
+					}
 					break;
 				case usio_btn::taiko_hit_center_right:
 					if (value.pressed)
+					{
+						usio_log.notice("Taiko hit: Center Right (player=%d, poll_interval=%dms)", player, poll_interval_ms);
 						std::memcpy(input_buf.data() + 36 + offset, &c_hit, sizeof(u16));
+					}
 					break;
 				case usio_btn::taiko_hit_side_right:
 					if (value.pressed)
+					{
+						usio_log.notice("Taiko hit: Side Right (player=%d, poll_interval=%dms)", player, poll_interval_ms);
 						std::memcpy(input_buf.data() + 38 + offset, &c_hit, sizeof(u16));
+					}
 					break;
 				case usio_btn::taiko_hit_center_left:
 					if (value.pressed)
+					{
+						usio_log.notice("Taiko hit: Center Left (player=%d, poll_interval=%dms)", player, poll_interval_ms);
 						std::memcpy(input_buf.data() + 34 + offset, &c_hit, sizeof(u16));
+					}
 					break;
 				case usio_btn::card_tapping:
 					if (value.pressed)
