@@ -649,6 +649,11 @@ usb_handler_thread::~usb_handler_thread()
 
 void usb_handler_thread::operator()()
 {
+	// Give this thread a slight priority boost: it's what delivers USIO/taiko input
+	// completions to the game, so scheduling jitter here directly becomes input jitter.
+	// Same pattern already used by the audio thread (cellAudio.cpp) for the same reason.
+	thread_ctrl::scoped_priority high_prio(+1);
+
 	timeval lusb_tv{0, 0};
 	if (!hotplug_supported)
 	{
@@ -669,8 +674,6 @@ void usb_handler_thread::operator()()
 		// Process asynchronous requests that are pending
 		libusb_handle_events_timeout_completed(ctx, &lusb_tv, nullptr);
 
-		u64 delay = 1'000;
-
 		// Process fake transfers
 		if (libusbd_active && !fake_transfers.empty())
 		{
@@ -685,13 +688,6 @@ void usb_handler_thread::operator()()
 
 				if (transfer->expected_time > timestamp)
 				{
-					const u64 diff_time = transfer->expected_time - timestamp;
-
-					if (diff_time < delay)
-					{
-						delay = diff_time;
-					}
-
 					++it;
 					continue;
 				}
@@ -710,7 +706,7 @@ void usb_handler_thread::operator()()
 		if (handled_devices.empty())
 			thread_ctrl::wait_for(500'000);
 		else
-			thread_ctrl::wait_for(delay);
+			std::this_thread::yield();
 	}
 }
 
