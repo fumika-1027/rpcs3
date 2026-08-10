@@ -333,11 +333,10 @@ void usb_device_usio::translate_input_taiko()
 			static constexpr usz byte_offset[4] = {32, 34, 36, 38};
 
 			// Consumption: at most one hit per lane per call, reporting the *most recent*
-			// press. Same design intent as the known-good usio1.cpp, but using
-			// exchange(0) on a flag instead of draining a queue/counter one entry at a
-			// time - see the comment on g_taiko_pending above for why a backlog can't
-			// usefully be drained slower than one-per-poll anyway. No lock needed: this is
-			// a single-producer/single-consumer flag per lane.
+			// press, using exchange(0) on a flag instead of draining a queue/counter one
+			// entry at a time - see the comment on g_taiko_pending above for why a
+			// backlog can't usefully be drained slower than one-per-poll anyway. No lock
+			// needed: this is a single-producer/single-consumer flag per lane.
 			for (usz lane = 0; lane < 4; lane++)
 			{
 				auto& pending = g_taiko_pending[player][lane];
@@ -891,8 +890,8 @@ void usb_device_usio::interrupt_transfer(u32 buf_size, u8* buf, u32 endpoint, Us
 	transfer->expected_result = HC_CC_NOERR;
 	// NOTE: do NOT add an artificial delay here (e.g. get_timestamp() + 1'000).
 	// This transfer carries the controller/taiko input state back to the game, so any
-	// added latency here is added latency on every single input poll. usio1.cpp (the
-	// known-good, zero-latency version) completes this transfer immediately.
+	// added latency here is added latency on every single input poll. This transfer
+	// is completed immediately to keep input latency at zero.
 	transfer->expected_time = get_timestamp();
 
 	is_used = true;
