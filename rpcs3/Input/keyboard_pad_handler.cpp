@@ -1404,7 +1404,16 @@ void keyboard_pad_handler::process()
 					const u32 player_idx = pad->m_player_id;
 					if (player_idx < 2)
 					{
-						g_taiko_pending[player_idx][lane].fetch_add(1, std::memory_order_release);
+						// Cap the backlog at 2: past this point, further queued hits would
+						// only widen the gap between when they were actually played and
+						// when they get reported (see the comment on g_taiko_pending in
+						// usio.cpp), without meaningfully improving multi-hit tolerance
+						// over what a 2-deep backlog already covers.
+						auto& pending = g_taiko_pending[player_idx][lane];
+						u32 cur = pending.load(std::memory_order_relaxed);
+						while (cur < 2 && !pending.compare_exchange_weak(cur, cur + 1, std::memory_order_release, std::memory_order_relaxed))
+						{
+						}
 					}
 				}
 			}
