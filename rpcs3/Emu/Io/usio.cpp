@@ -14,9 +14,12 @@
 // translate_input_taiko() call. This avoids losing hits that happen between two calls when
 // the game polls slower than the player can hit the drum.
 //
-// This is a simple lock-free SPSC (single producer / single consumer) counter per lane:
-// keyboard_pad_handler::process() is the only producer (fetch_add on a fresh press), and
-// translate_input_taiko() below is the only consumer (fetch_sub when reporting a hit). No
+// This is a simple lock-free SPSC (single producer / single consumer) counter per lane,
+// capped at 2: keyboard_pad_handler::process() is the only producer (increments up to the
+// cap on a fresh press), and translate_input_taiko() below is the only consumer (fetch_sub
+// when reporting a hit). The cap keeps a backlog from growing without bound - past 2
+// pending hits, queueing more would only widen the gap between when a hit was actually
+// played and when it gets reported, without meaningfully improving multi-hit tolerance. No
 // mutex, no heap allocation, no lock contention between the pad thread and the USB thread.
 std::atomic<u32> g_taiko_pending[2][4]{};
 
